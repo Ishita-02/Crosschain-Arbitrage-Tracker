@@ -2,6 +2,7 @@ import axios from "axios";
 import Web3 from "web3";
 import "dotenv/config";
 import { CONFIG } from "./config.js";
+import {signAndSendTransaction} from "./utils.js"
 
 // --- ENVIRONMENT & SETUP --- //
 const { ROUTER_URL, ROUTER_API_KEY, ROUTER_INTEGRATOR_PID, ARBITRUM_RPC_URL, BASE_RPC_URL, OPTIMISM_RPC_URL } = process.env;
@@ -12,7 +13,7 @@ const web3Instances = {
     optimism: new Web3(OPTIMISM_RPC_URL),
 };
 
-async function getQuoteFromRouter(chainName, fromToken, toToken, amount) {
+async function getPriceFromRouter(chainName, fromToken, toToken, amount) {
   const payload = {
     chainID: chainName, inputToken: fromToken, outputToken: toToken,
     inputAmount: amount, computeEstimate: true, uniquePID: ROUTER_INTEGRATOR_PID,
@@ -47,7 +48,7 @@ async function getNativeTokenPrices() {
     const prices = {};
     for (const chain of CONFIG.chains) {
         if (chain.tokens.WETH && chain.tokens.USDC) {
-            const quote = await getQuoteFromRouter(chain.name, chain.tokens.WETH, chain.tokens.USDC, (10n**18n).toString());
+            const quote = await getPriceFromRouter(chain.name, chain.tokens.WETH, chain.tokens.USDC, (10n**18n).toString());
             prices[chain.name] = quote ? parseFloat(quote.effectiveOutputAmountUSD) : 0;
         } else {
             prices[chain.name] = 0; 
@@ -72,8 +73,8 @@ async function checkPairOnChains(chainA, chainB, pair, nativeTokenPrices) {
   }
 
   const [quoteResultA, quoteResultB] = await Promise.all([
-    getQuoteFromRouter(chainA.name, chainA.tokens[pair.from], chainA.tokens[pair.to], pair.tradeAmount),
-    getQuoteFromRouter(chainB.name, chainB.tokens[pair.from], chainB.tokens[pair.to], pair.tradeAmount),
+    getPriceFromRouter(chainA.name, chainA.tokens[pair.from], chainA.tokens[pair.to], pair.tradeAmount),
+    getPriceFromRouter(chainB.name, chainB.tokens[pair.from], chainB.tokens[pair.to], pair.tradeAmount),
   ]);
 
   if (!quoteResultA || !quoteResultB) return;
