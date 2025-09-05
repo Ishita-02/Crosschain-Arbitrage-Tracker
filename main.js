@@ -1,10 +1,21 @@
 import axios from "axios";
 import Web3 from "web3";
 import "dotenv/config";
+import pg from "pg";
 import { CONFIG } from "./config.js";
-import {signAndSendTransaction} from "./utils.js"
 
-// --- ENVIRONMENT & SETUP --- //
+const { Pool } = pg;
+const pool = new Pool();
+console.log("Attempting to connect to PostgreSQL...");
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error("Database connection error:", err.stack);
+  } else {
+    console.log("Successfully connected to PostgreSQL database.");
+  }
+});
+
+
 const { ROUTER_URL, ROUTER_API_KEY, ROUTER_INTEGRATOR_PID, ARBITRUM_RPC_URL, BASE_RPC_URL, OPTIMISM_RPC_URL } = process.env;
 const rpcUrls = { arbitrum: ARBITRUM_RPC_URL, base: BASE_RPC_URL, optimism: OPTIMISM_RPC_URL };
 const web3Instances = {
@@ -33,13 +44,10 @@ async function getGasCostInUSD(chainConfig, nativeTokenPriceUSD) {
         const web3 = web3Instances[chainConfig.name];
         const gasPriceWei = await web3.eth.getGasPrice();
         const gasCostNative = BigInt(gasPriceWei) * BigInt(chainConfig.estimatedGasLimit);
-        
         const gasCostInEther = web3.utils.fromWei(gasCostNative.toString(), 'ether');
         const costUSD = parseFloat(gasCostInEther) * nativeTokenPriceUSD;
-        
         return costUSD;
     } catch (error) {
-        console.error(`Could not get gas cost for ${chainConfig.name}: ${error.message}`);
         return Infinity;
     }
 }
@@ -57,27 +65,33 @@ async function getNativeTokenPrices() {
     return prices;
 }
 
+async function saveOpportunity(opportunity) {
+    const { pairName, buyChain, sellChain, netProfitUSD } = opportunity;
+    const queryText = `
+        INSERT INTO opportunities (pair_name, buy_chain, sell_chain, net_profit_usd)
+        VALUES ($1, $2, $3, $4)
+    `;
+    try {
+        await pool.query(queryText, [pairName, buyChain, sellChain, netProfitUSD]);
+        console.log(`💾  Saved opportunity to database: ${pairName} | $${netProfitUSD.toFixed(4)}`);
+    } catch (error) {
+        console.error("❌  Error saving opportunity to database:", error);
+    }
+}
 
-// --- MAIN ARBITRAGE LOGIC --- //
 
 async function checkPairOnChains(chainA, chainB, pair, nativeTokenPrices) {
   const pairName = `${pair.from}/${pair.to}`;
 
-  if (!chainA.tokens[pair.from] || !chainA.tokens[pair.to]) {
-    console.log(`-> SKIPPING ${pairName} on ${chainA.name}: Token not configured.`);
-    return;
-  }
-  if (!chainB.tokens[pair.from] || !chainB.tokens[pair.to]) {
-     console.log(`-> SKIPPING ${pairName} on ${chainB.name}: Token not configured.`);
-    return;
-  }
+  if (!chainA.tokens[pair.from] || !chainA.tokens[pair.to]) return null;
+  if (!chainB.tokens[pair.from] || !chainB.tokens[pair.to]) return null;
 
   const [quoteResultA, quoteResultB] = await Promise.all([
     getPriceFromRouter(chainA.name, chainA.tokens[pair.from], chainA.tokens[pair.to], pair.tradeAmount),
     getPriceFromRouter(chainB.name, chainB.tokens[pair.from], chainB.tokens[pair.to], pair.tradeAmount),
   ]);
 
-  if (!quoteResultA || !quoteResultB) return;
+  if (!quoteResultA || !quoteResultB) return null;
 
   const sellQuote = parseFloat(quoteResultA.effectiveOutputAmountUSD) > parseFloat(quoteResultB.effectiveOutputAmountUSD) ? quoteResultA : quoteResultB;
   const buyQuote = parseFloat(quoteResultA.effectiveOutputAmountUSD) > parseFloat(quoteResultB.effectiveOutputAmountUSD) ? quoteResultB : quoteResultA;
@@ -92,41 +106,57 @@ async function checkPairOnChains(chainA, chainB, pair, nativeTokenPrices) {
     getGasCostInUSD(buyChain, nativeTokenPrices[buyChain.name]),
   ]);
   const totalGasCostUSD = gasCostSell + gasCostBuy;
-  
   const netProfitUSD = grossProfitUSD - totalGasCostUSD;
 
-  console.log("")
-  console.log(`-- ${pairName} | ${sellChain.name} (Sell) vs ${buyChain.name} (Buy) --`);
-  console.log(`Gross Profit: $${grossProfitUSD.toFixed(4)} | Gas Costs: $${totalGasCostUSD.toFixed(4)} | Net Profit: $${netProfitUSD.toFixed(4)}`);
-  console.log("")
+  console.log(`-- ${pairName} | ${sellChain.name} (Sell) vs ${buyChain.name} (Buy) | Net Profit: $${netProfitUSD.toFixed(4)}`);
 
   const initialInvestmentUSD = parseFloat(buyQuote.inputAmountUSD);
-  if(initialInvestmentUSD === 0) return; 
+  if(initialInvestmentUSD === 0) return null; 
   const percentageProfit = (netProfitUSD / initialInvestmentUSD) * 100;
 
   if (netProfitUSD > 0 && percentageProfit > CONFIG.PROFIT_THRESHOLD) {
-    console.log(`🔥🔥🔥 PAPER TRADE OPPORTUNITY: ${pairName} | Net Profit: $${netProfitUSD.toFixed(4)} 🔥🔥🔥`);
-    console.log(`ACTION: SELL ${pair.from} on ${sellChain.name}, BUY ${pair.from} on ${buyChain.name}`);
-    console.log("")
+    return {
+      pairName,
+      buyChain: buyChain.name,
+      sellChain: sellChain.name,
+      netProfitUSD,
+    };
   }
+  return null;
 }
 
 async function main() {
-  console.log("Starting Highly-Accurate Gas-Aware Scanner...");
+  console.log("🚀 Starting Scanner with Database Logging...");
   setInterval(async () => {
-    console.log(`\n--- Cycle Starting at ${new Date().toLocaleString()} ---`);
-    
+    console.log(`\n--- New Scan Cycle at ${new Date().toLocaleString()} ---`);
     const nativeTokenPrices = await getNativeTokenPrices();
     console.log("Current ETH Prices:", nativeTokenPrices);
+
+    const profitableOpportunities = [];
 
     for (let i = 0; i < CONFIG.chains.length; i++) {
       for (let j = i + 1; j < CONFIG.chains.length; j++) {
         for (const pair of CONFIG.pairs) {
-          await checkPairOnChains(CONFIG.chains[i], CONFIG.chains[j], pair, nativeTokenPrices);
+          const result = await checkPairOnChains(CONFIG.chains[i], CONFIG.chains[j], pair, nativeTokenPrices);
+          if (result) {
+            profitableOpportunities.push(result);
+            await saveOpportunity(result); 
+          }
         }
       }
     }
-  }, 45000);
+
+    console.log("\n--- Top 3 Profitable Opportunities This Cycle ---");
+    if (profitableOpportunities.length === 0) {
+      console.log("No profitable opportunities found that meet the threshold.");
+    } else {
+      profitableOpportunities.sort((a, b) => b.netProfitUSD - a.netProfitUSD);
+      profitableOpportunities.slice(0, 3).forEach((opp, index) => {
+        console.log(`#${index + 1}: ${opp.pairName} | Route: ${opp.buyChain} -> ${opp.sellChain} | PROFIT: $${opp.netProfitUSD.toFixed(4)}`);
+      });
+    }
+
+  }, 60000);
 }
 
 main().catch(console.error);
