@@ -73,9 +73,9 @@ async function saveOpportunity(opportunity) {
     `;
     try {
         await pool.query(queryText, [pairName, buyChain, sellChain, netProfitUSD]);
-        console.log(`💾  Saved opportunity to database: ${pairName} | $${netProfitUSD.toFixed(4)}`);
+        console.log(`Saved opportunity to database: ${pairName} | $${netProfitUSD.toFixed(4)}`);
     } catch (error) {
-        console.error("❌  Error saving opportunity to database:", error);
+        console.error("Error saving opportunity to database:", error);
     }
 }
 
@@ -126,7 +126,7 @@ async function checkPairOnChains(chainA, chainB, pair, nativeTokenPrices) {
 }
 
 async function main() {
-  console.log("🚀 Starting Scanner with Database Logging...");
+  console.log("Starting Scanner with Database Logging...");
   setInterval(async () => {
     console.log(`\n--- New Scan Cycle at ${new Date().toLocaleString()} ---`);
     const nativeTokenPrices = await getNativeTokenPrices();
