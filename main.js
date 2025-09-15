@@ -22,6 +22,33 @@ pool.query('SELECT NOW()', (err, res) => {
   }
 });
 
+async function setupDatabase() {
+  const setupQuery = `
+    CREATE TABLE IF NOT EXISTS opportunities (
+        id SERIAL PRIMARY KEY,
+        pair_name VARCHAR(50) NOT NULL,
+        buy_chain VARCHAR(50) NOT NULL,
+        sell_chain VARCHAR(50) NOT NULL,
+        net_profit_usd DECIMAL(18, 4) NOT NULL,
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_opportunities_timestamp ON opportunities(timestamp);
+  `;
+  try {
+    const client = await pool.connect();
+    console.log("Successfully connected to PostgreSQL database.");
+    console.log("Checking and setting up database schema...");
+    await client.query(setupQuery);
+    console.log("Database schema is ready.");
+    client.release();
+  } catch (err) {
+    console.error("Database connection or setup error:", err.stack);
+    // Exit the process if we can't connect to or set up the DB
+    process.exit(1); 
+  }
+}
+
 
 const { ROUTER_URL, ROUTER_API_KEY, ROUTER_INTEGRATOR_PID, ARBITRUM_RPC_URL, BASE_RPC_URL, OPTIMISM_RPC_URL } = process.env;
 const rpcUrls = { arbitrum: ARBITRUM_RPC_URL, base: BASE_RPC_URL, optimism: OPTIMISM_RPC_URL };
@@ -133,6 +160,8 @@ async function checkPairOnChains(chainA, chainB, pair, nativeTokenPrices) {
 }
 
 async function main() {
+  await setupDatabase();
+  
   console.log("Starting Scanner with Database Logging...");
   setInterval(async () => {
     console.log(`\n--- New Scan Cycle at ${new Date().toLocaleString()} ---`);
