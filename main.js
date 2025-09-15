@@ -5,7 +5,14 @@ import pg from "pg";
 import { CONFIG } from "./config.js";
 
 const { Pool } = pg;
-const pool = new Pool();
+const pool = new Pool({
+  // This line is key! It reads the DATABASE_URL from Render's environment.
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    // Render requires SSL connections, and this setting prevents errors.
+    rejectUnauthorized: false
+  }
+});
 console.log("Attempting to connect to PostgreSQL...");
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
