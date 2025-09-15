@@ -14,7 +14,7 @@ The Arbitrage Intelligence Platform is a full-stack application designed to auto
 
 <img width="1470" height="799" alt="Screenshot 2025-09-15 at 4 16 33 PM" src="https://github.com/user-attachments/assets/9d7c2af6-42ca-4427-b885-ca5ed9598dab" />
 
-![unnamed](https://github.com/user-attachments/assets/16415905-4d08-4201-b05a-056c694bf7de)
+<img width="1470" height="800" alt="Screenshot 2025-09-15 at 6 38 44 PM" src="https://github.com/user-attachments/assets/b1772f45-f6c5-46f1-a8de-808bde86c85c" />
 
 ## Architecture
 The application is composed of two main parts:
