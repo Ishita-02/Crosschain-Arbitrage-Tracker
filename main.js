@@ -6,9 +6,12 @@ import { CONFIG } from "./config.js";
 
 const { Pool } = pg;
 
-// Supabase connection using POSTGRES_URL
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
+  host: 'aws-1-ap-south-1.pooler.supabase.com',
+  port: 6543,
+  database: 'postgres',
+  user: process.env.POSTGRES_USER,
+  password: process.env.POSTGRES_PASSWORD,
   ssl: {
     rejectUnauthorized: false
   }
