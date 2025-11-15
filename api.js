@@ -8,15 +8,18 @@ const app = express();
 
 const { Pool } = pg;
 
-// Supabase connection using POSTGRES_URL
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  host: 'aws-1-ap-south-1.pooler.supabase.com',
+  port: 6543,
+  database: 'postgres',
+  user: process.env.POSTGRES_USER,
+  password: process.env.POSTGRES_PASSWORD
 });
 
-// Test connection
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
     console.error("Database connection error:", err.stack);
@@ -77,6 +80,6 @@ app.get("/api/leaderboard/pairs", async (req, res) => {
     }
   });
 
-app.listen("https://crosschain-arbitrage-tracker.onrender.com", () => {
-  console.log(`🚀 API server is running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 API server is running on port ${PORT}`);
 });
