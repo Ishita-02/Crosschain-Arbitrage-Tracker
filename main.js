@@ -2,10 +2,15 @@ import axios from "axios";
 import Web3 from "web3";
 import "dotenv/config";
 import pg from "pg";
+import dns from 'dns';
 import { CONFIG } from "./config.js";
+
+// Force Node.js to prefer IPv4 over IPv6
+dns.setDefaultResultOrder('ipv4first');
 
 const { Pool } = pg;
 
+// Supabase connection - Force IPv4 resolution to avoid IPv6 network issues
 const pool = new Pool({
   host: 'aws-1-ap-south-1.pooler.supabase.com',
   port: 6543,
@@ -14,8 +19,37 @@ const pool = new Pool({
   password: process.env.POSTGRES_PASSWORD,
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  // Force IPv4 DNS resolution
+  options: '-c search_path=public'
 });
+
+// Override default connection to force IPv4
+pool.on('connect', (client) => {
+  client.connection.stream.setNoDelay(true);
+});
+
+// Alternative: Use direct pooler config with IPv4 forcing
+const connectionConfig = {
+  host: 'aws-1-ap-south-1.pooler.supabase.com',
+  port: 6543,
+  database: 'postgres',
+  user: process.env.POSTGRES_USER,
+  password: process.env.POSTGRES_PASSWORD,
+  ssl: {
+    rejectUnauthorized: false
+  }
+};
+
+// Force DNS to return IPv4 only by using net.connect options
+import net from 'net';
+const originalConnect = net.connect;
+net.connect = function(...args) {
+  if (args[0] && typeof args[0] === 'object') {
+    args[0].family = 4; // Force IPv4
+  }
+  return originalConnect.apply(this, args);
+};
 
 console.log("Attempting to connect to Supabase PostgreSQL...");
 pool.query('SELECT NOW()', (err, res) => {

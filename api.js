@@ -1,23 +1,27 @@
 import express from "express";
 import pg from "pg";
 import cors from "cors";
+import dns from 'dns';
 import "dotenv/config";
 
-const PORT = process.env.PORT ;
+// Force Node.js to prefer IPv4 over IPv6
+dns.setDefaultResultOrder('ipv4first');
+
+const PORT = process.env.PORT || 3001;
 const app = express();
 
 const { Pool } = pg;
 
+// Supabase connection
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
-  ssl: {
-    rejectUnauthorized: false
-  },
   host: 'aws-1-ap-south-1.pooler.supabase.com',
   port: 6543,
   database: 'postgres',
   user: process.env.POSTGRES_USER,
-  password: process.env.POSTGRES_PASSWORD
+  password: process.env.POSTGRES_PASSWORD,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 pool.query('SELECT NOW()', (err, res) => {
