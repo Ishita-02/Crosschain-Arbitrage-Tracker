@@ -5,23 +5,26 @@ import pg from "pg";
 import { CONFIG } from "./config.js";
 
 const { Pool } = pg;
+
+// Supabase connection using POSTGRES_URL
 const pool = new Pool({
-  // This line is key! It reads the DATABASE_URL from Render's environment.
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.POSTGRES_URL,
   ssl: {
-    // Render requires SSL connections, and this setting prevents errors.
     rejectUnauthorized: false
   }
 });
-console.log("Attempting to connect to PostgreSQL...");
+
+console.log("Attempting to connect to Supabase PostgreSQL...");
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
     console.error("Database connection error:", err.stack);
   } else {
-    console.log("Successfully connected to PostgreSQL database.");
+    console.log("Successfully connected to Supabase database.");
+    console.log("Server time:", res.rows[0].now);
   }
 });
 
+// Uncomment and run this ONCE to set up your database schema
 async function setupDatabase() {
   const setupQuery = `
     CREATE TABLE IF NOT EXISTS opportunities (
@@ -29,6 +32,7 @@ async function setupDatabase() {
         pair_name VARCHAR(50) NOT NULL,
         buy_chain VARCHAR(50) NOT NULL,
         sell_chain VARCHAR(50) NOT NULL,
+        initial_investment_usd DECIMAL(18, 4),
         net_profit_usd DECIMAL(18, 4) NOT NULL,
         timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
@@ -37,18 +41,15 @@ async function setupDatabase() {
   `;
   try {
     const client = await pool.connect();
-    console.log("Successfully connected to PostgreSQL database.");
-    console.log("Checking and setting up database schema...");
+    console.log("Setting up database schema...");
     await client.query(setupQuery);
     console.log("Database schema is ready.");
     client.release();
   } catch (err) {
-    console.error("Database connection or setup error:", err.stack);
-    // Exit the process if we can't connect to or set up the DB
+    console.error("Database setup error:", err.stack);
     process.exit(1); 
   }
 }
-
 
 const { ROUTER_URL, ROUTER_API_KEY, ROUTER_INTEGRATOR_PID, ARBITRUM_RPC_URL, BASE_RPC_URL, OPTIMISM_RPC_URL } = process.env;
 const rpcUrls = { arbitrum: ARBITRUM_RPC_URL, base: BASE_RPC_URL, optimism: OPTIMISM_RPC_URL };
@@ -100,19 +101,18 @@ async function getNativeTokenPrices() {
 }
 
 async function saveOpportunity(opportunity) {
-    const { pairName, buyChain, sellChain, netProfitUSD } = opportunity;
+    const { pairName, buyChain, sellChain, netProfitUSD, initialInvestmentUSD } = opportunity;
     const queryText = `
-        INSERT INTO opportunities (pair_name, buy_chain, sell_chain, net_profit_usd)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO opportunities (pair_name, buy_chain, sell_chain, net_profit_usd, initial_investment_usd)
+        VALUES ($1, $2, $3, $4, $5)
     `;
     try {
-        await pool.query(queryText, [pairName, buyChain, sellChain, netProfitUSD]);
+        await pool.query(queryText, [pairName, buyChain, sellChain, netProfitUSD, initialInvestmentUSD]);
         console.log(`Saved opportunity to database: ${pairName} | $${netProfitUSD.toFixed(4)}`);
     } catch (error) {
         console.error("Error saving opportunity to database:", error);
     }
 }
-
 
 async function checkPairOnChains(chainA, chainB, pair, nativeTokenPrices) {
   const pairName = `${pair.from}/${pair.to}`;
@@ -154,15 +154,17 @@ async function checkPairOnChains(chainA, chainB, pair, nativeTokenPrices) {
       buyChain: buyChain.name,
       sellChain: sellChain.name,
       netProfitUSD,
+      initialInvestmentUSD
     };
   }
   return null;
 }
 
 async function main() {
-  await setupDatabase();
-  
-  console.log("Starting Scanner with Database Logging...");
+  // IMPORTANT: Uncomment this line on first run to create the table
+  // await setupDatabase();
+
+  console.log("Starting Scanner with Supabase Database Logging...");
   setInterval(async () => {
     console.log(`\n--- New Scan Cycle at ${new Date().toLocaleString()} ---`);
     const nativeTokenPrices = await getNativeTokenPrices();
@@ -196,4 +198,3 @@ async function main() {
 }
 
 main().catch(console.error);
-

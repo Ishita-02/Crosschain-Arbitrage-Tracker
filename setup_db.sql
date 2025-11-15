@@ -5,6 +5,7 @@ CREATE TABLE opportunities (
     pair_name VARCHAR(50) NOT NULL,
     buy_chain VARCHAR(50) NOT NULL,
     sell_chain VARCHAR(50) NOT NULL,
+    initial_investment_usd DECIMAL(18, 4),
     net_profit_usd DECIMAL(18, 4) NOT NULL,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

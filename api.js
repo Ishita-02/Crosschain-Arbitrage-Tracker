@@ -7,7 +7,23 @@ const PORT = process.env.PORT ;
 const app = express();
 
 const { Pool } = pg;
-const pool = new Pool();
+
+// Supabase connection using POSTGRES_URL
+const pool = new Pool({
+  connectionString: process.env.POSTGRES_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+// Test connection
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error("Database connection error:", err.stack);
+  } else {
+    console.log("Successfully connected to Supabase database.");
+  }
+});
 
 app.use(cors()); 
 app.use(express.json()); 
@@ -61,9 +77,6 @@ app.get("/api/leaderboard/pairs", async (req, res) => {
     }
   });
 
-
 app.listen(PORT, () => {
   console.log(`🚀 API server is running on http://localhost:${PORT}`);
 });
-
-    

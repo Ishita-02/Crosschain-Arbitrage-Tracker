@@ -41,7 +41,9 @@ const OpportunitiesTable = ({ opportunities }) => (
           <tr>
             <th className="p-4 text-sm font-medium text-slate-400">Pair</th>
             <th className="p-4 text-sm font-medium text-slate-400">Route</th>
+            <th className="p-4 text-sm font-medium text-slate-400 text-right">Trade Amount (USD)</th>
             <th className="p-4 text-sm font-medium text-slate-400 text-right">Net Profit (USD)</th>
+            <th className="p-4 text-sm font-medium text-slate-400 text-right">Profit %</th>
             <th className="p-4 text-sm font-medium text-slate-400 text-right">Timestamp</th>
           </tr>
         </thead>
@@ -54,7 +56,11 @@ const OpportunitiesTable = ({ opportunities }) => (
                 <ArrowRightIcon />
                 {op.sell_chain}
               </td>
+              <td className="p-4 text-slate-300 font-mono text-right">${parseFloat(op.initial_investment_usd).toFixed(2)}</td>
               <td className="p-4 text-green-400 font-mono text-right">${parseFloat(op.net_profit_usd).toFixed(4)}</td>
+              <td className="p-4 text-green-400 font-mono text-right">
+                {((parseFloat(op.net_profit_usd) / parseFloat(op.initial_investment_usd)) * 100).toFixed(2)}%
+              </td>
               <td className="p-4 text-slate-500 font-mono text-right text-xs">{new Date(op.timestamp).toLocaleString()}</td>
             </tr>
           )) : (

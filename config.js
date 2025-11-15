@@ -35,7 +35,7 @@ export const CONFIG = {
         DAI: "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
         WBTC: "0x68f180fcCe6836688e9084f035309E29Bf0A2095",
       },
-    },
+    }
   ],
 
   pairs: [
