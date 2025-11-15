@@ -77,6 +77,6 @@ app.get("/api/leaderboard/pairs", async (req, res) => {
     }
   });
 
-app.listen(PORT, () => {
+app.listen("https://crosschain-arbitrage-tracker.onrender.com", () => {
   console.log(`🚀 API server is running on http://localhost:${PORT}`);
 });
