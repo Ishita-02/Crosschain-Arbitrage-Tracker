@@ -84,6 +84,10 @@ app.get("/api/leaderboard/pairs", async (req, res) => {
     }
   });
 
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 API server is running on port ${PORT}`);
 });
