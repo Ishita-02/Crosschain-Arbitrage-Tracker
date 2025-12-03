@@ -2,14 +2,19 @@ name: Keep Render Alive
 
 on:
   schedule:
-    - cron: "*/12 * * * *"  
-  workflow_dispatch:       
+    - cron: "*/12 * * * *"   
+  workflow_dispatch:         
 
 jobs:
-  keep_alive:
+  ping_service:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Ping Render Service
+      - name: Ping Render Service (with retries)
         run: |
-          echo "Pinging Render service..."
-          curl -I --max-time 30 https://YOUR_RENDER_URL || echo "Service unreachable"
+          echo "🌐 Pinging Render service..."
+          for i in {1..5}; do
+            curl -I --max-time 40 https://crosschain-arbitrage-tracker-2.onrender.com && break
+            echo "Attempt $i failed… retrying in 5 sec."
+            sleep 5
+          done
